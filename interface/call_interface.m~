@@ -34,17 +34,12 @@ if ~exist('~/speechOnSpeech/maskerFiles', 'dir')
 end
 
 if ~exist('~/speechOnSpeech/sentences', 'dir')
-    disp('sentences not available')
-%     error('sentences not available')
+    error('sentences not available')
 end
 
-PathToStraight = '/home/paolot/gitStuff/Beautiful/lib/STRAIGHTV40_006b/';
-[b, s] = is_test_machine;
-if ~strcmp(s, '12-000-4372')
-    PathToStraight = genpath(fullfile('..', 'straight', 'STRAIGHT'));
-end
-if ~exist(PathToStraight, 'dir')
-    error('Wrong path for straight')
+PathToStraight = genpath(fullfile('..', 'straight', 'STRAIGHT'));
+if ~exist('~/speechOnSpeech/sentences', 'dir')
+    error('sentences not available')
 end
 
 
