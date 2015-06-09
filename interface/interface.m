@@ -11,7 +11,9 @@ function p = interface(Options, Phase_Index)
 % Function modified by Nawal El Boghdady on 01-06-2015
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    load('backup.mat') %this struct contains a backup of everything, even the GUIs!
+    % paol8 got rid of this shit!
+    % load('backup.mat') %this struct contains a backup of everything, even the GUIs!
+    
     %backup.mat contains the following parameters:
     %   Options     <struct>
     %   p           <struct>
@@ -20,18 +22,18 @@ function p = interface(Options, Phase_Index)
     %   stimuli     <row vector>
     %   User2_Sitch <2-element row vector>
     %   User_Sitch  <scalar INT>
-    %   wait        <scalar INT>
+    %   delay        <scalar INT>
 
 
     if exist('p', 'var') %check if struct 'p' was loaded from backup.mat
         p = initialize_saved(p);
     else
         %else create 'p'
-        p = initialize_parameters(Options, Phase_Index);
+        p = setExpPar(Options, Phase_Index);
         p = make_file_names(p);
     end
-    p = initialize_figures_and_get_handles(p, Options);
-    wait=0;
+    p = guiDefinition(p, Options);
+    delay=0;
     pressed = 0;
 
     % The while loop contains the core of the GUI. The loop runs from the beginning of some phase of an experiment,
@@ -39,7 +41,7 @@ function p = interface(Options, Phase_Index)
 
     while (p.Continu==1  || ~isempty(p.AnnotationsAvailable))
 
-        if wait == 0
+        if delay == 0
 
             set(p.InstructionHandle6, 'Visible', 'off');
             set(p.InstructionHandle7, 'Visible', 'off');
@@ -70,7 +72,7 @@ function p = interface(Options, Phase_Index)
                 case 10
                     p.current_situation = 10;
                     p = set_progress_bar(p, p.f1, p.i, 'on', p.PosBar1);
-                    stimuli = create_stimuli(p);
+                    stimuli = create_stimuli(p, Options);
                     p.Player = audioplayer(stimuli, p.fs);
                     play(p.Player);
                     p = set_GUI_case10(p);
@@ -102,7 +104,7 @@ function p = interface(Options, Phase_Index)
                     set(p.ImageJohnHappy, 'Visible', 'off')
                     set(p.Text, 'Visible', 'off')
                     set(p.ImageArrow2, 'Visible', 'off')
-                    set(p.InstructionHandle1, 'String', 'Waiting for Nikki and/or Mike -_-', 'Visible', 'on');
+                    set(p.InstructionHandle1, 'String', 'delaying for Nikki and/or Mike -_-', 'Visible', 'on');
                     if strcmp(p.Phase , 'Test4')==1
                         set(p.InstructionHandle1, 'Visible', 'off');
                     end
@@ -119,7 +121,7 @@ function p = interface(Options, Phase_Index)
                 case 25
                     p.current_situation = 25;
                     p = set_progress_bar(p, p.f1, p.i, 'on', p.PosBar1);
-                    stimuli = create_stimuli(p);
+                    stimuli = create_stimuli(p, Options);
                     p.Player = audioplayer(stimuli, p.fs);
                     play(p.Player);
                     p = set_GUI_case25(p);
@@ -176,7 +178,8 @@ function p = interface(Options, Phase_Index)
                 if p.Continu == 0 && isempty(p.AnnotationsAvailable)
                     close all
                 end
-                save 'backup.mat'
+%                 save 'backup.mat' % paol8: saving all variables in the workspace... are you nuts?!?     
+
         end
         pause(0.1);
     end
@@ -192,14 +195,24 @@ function p = set_buttons(p)
 
     switch p.ManVrouw
         case 'Man'
-            sentence = p.VU_Zinnen{VU_index};
+            sentence = p.VU_zinnen{VU_index};
         case 'Vrouw'
-            sentence = p.VU_Zinnen{VU_index+507};
+            sentence = p.VU_zinnen{VU_index+507};
     end
 
-    line_cell_cell=textscan(sentence,'%s',10,'delimiter',' ');
-    p.Words=line_cell_cell{1};
-    p.Spacing = (p.WidthBig/(length(p.Words))) - p.WidthBig/25;
+%     line_cell_cell=textscan(sentence,'%s',10,'delimiter',' ');
+%     p.Words=line_cell_cell{1};
+    p.Words = regexp(sentence, ' ', 'split');
+    
+    [screenSub, screenExp] = getScreens;
+    
+    widthSubScrn = screenSub(3);
+    widthExpScreen = screenExp(3);
+    heightSubScrn =  screenSub(4);
+    heightBigExpScreen = screenExp(4);
+
+    
+    p.Spacing = (widthExpScreen/(length(p.Words))) - widthExpScreen/25;
     p.SentenceScore = ones(length(p.Words), 1);
 
     for i2=1:length(p.Words)
@@ -274,157 +287,6 @@ function p = save_score(p)
 
 end
 
-%%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%%%%%  
-%%%%%%%%%%%%%%%%%%%%% %%%%%% STIMULI %%%%%% %%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%%%%% 
-
-
-function stimuli = create_stimuli(p)
-    display('subject')
-    conditions = sscanf(p.FileNames{p.i}, sprintf('%s%%03d_f0%%d_vtl%%f_snr%%d', p.ManVrouw));
-    target_signal_pre = wavread(fullfile('sentences', sprintf('%s%03d.wav', p.ManVrouw, conditions(1))));
-
-    list = p.MaskerLists(1) + round(rand()*(p.MaskerLists(2) - p.MaskerLists(1)));
-    index1 = round((((list-1)*13)+round(rand()*13)));
-    index2=index1;
-    while index2==index1
-        list = p.MaskerLists(1) + round(rand()*(p.MaskerLists(2) - p.MaskerLists(1)));
-        index2 = round((((list-1)*13)+round(rand()*13)));
-    end
-
-    if exist(fullfile('masker files', sprintf('%s%03d_f0%d_vtl%.2f.wav', p.ManVrouw, index1, conditions(2), conditions(3))), 'file') ~= 0
-        masker1 = wavread(fullfile('masker files', sprintf('%s%03d_f0%d_vtl%.2f.wav', p.ManVrouw, index1, conditions(2), conditions(3))));
-    else
-        masker1 = wavread(fullfile('sentences', sprintf('%s%03d.wav', p.ManVrouw, index1)));
-        [p, masker1] = modify_masker(p, masker1, conditions, p.fs, p.ManVrouw, index1);          %%%%%%
-    end
-
-    if exist(fullfile('masker files', sprintf('%s%03d_f0%d_vtl%.2f.wav', p.ManVrouw, index2, conditions(2), conditions(3))), 'file') ~= 0
-        masker2 = wavread(fullfile('masker files', sprintf('%s%03d_f0%d_vtl%.2f.wav', p.ManVrouw, index2, conditions(2), conditions(3))));
-    else
-        masker2 = wavread(fullfile('sentences', sprintf('%s%03d.wav', p.ManVrouw, index2)));
-        [p, masker2] = modify_masker(p, masker2, conditions, p.fs, p.ManVrouw, index2);
-    end
-
-
-    target_signal_pre = 0.98 * target_signal_pre / max(abs(target_signal_pre));
-    start = find(abs(target_signal_pre)>.02, 1, 'first');
-    target_signal = target_signal_pre(start:end);
-    target_signal = [zeros(1, round(p.fs*0.5)) target_signal'];
-
-    % masker 1 start
-    start = round(rand()*(length(masker1)-p.fs));
-    masker1 = masker1(start:end);
-
-    start = round(rand()*(length(masker2)-p.fs));
-    masker2 = masker2(start:end);
-
-    masker1 = cosgate(masker1, p.fs, 2e-3);
-    masker2 = cosgate(masker2, p.fs, 2e-3);
-
-    masker = [masker1' masker2'];
-
-    len_diff = length(masker) - length(target_signal);
-
-    while len_diff < 0
-        additional_masker = get_additional_masker(p, conditions);
-        masker = [masker additional_masker'];
-        len_diff = length(masker) - length(target_signal);
-        warning('extending masker')
-    end
-
-    if len_diff > round(0.5*p.fs)
-        target_signal = [target_signal zeros(1, round(0.5*p.fs))];
-        masker = masker(1:length(target_signal));
-    else
-        target_signal = [target_signal zeros(1, len_diff)];
-    end
-
-    % attenuation
-    attenuate = p.Target_rms / rms(target_signal);
-    target_signal = target_signal*attenuate;
-
-    masker_rms = p.Target_rms/(10^(conditions(4)/20));
-
-    attenuate = masker_rms / rms(masker);
-    masker = masker * attenuate;
-
-    stimuli = target_signal+masker;
-
-    max_stim = max(abs(stimuli));
-    if max_stim > 1
-        stimuli = 0.98*stimuli / max(abs(stimuli));
-        max_stim2 = max(abs(stimuli));
-        warning(sprintf('Stimuli attenuated by %.2f%%', 100*(max_stim-max_stim2) / max_stim))
-    end
-
-end
-
-
-function [p, masker_new] = modify_masker(p, masker, conditions, fs, ManVrouw, index)    
-
-    p.InstructionHandle4= uicontrol('Parent', p.f2, 'Style', 'text', 'Units', 'pixel', 'Position', p.PosInstruction4, ...
-        'FontSize', 20, 'ForegroundColor', p.MainTextColor, 'BackgroundColor', p.BackgroundColor);
-    set(p.InstructionHandle4, 'String', 'Extracting data... Please be patient', 'Visible', 'on');
-
-    p.InstructionHandle5= uicontrol('Parent', p.f1, 'Style', 'text', 'Units', 'pixel', 'Position', p.PosInstruction5, ...
-        'FontSize', 20, 'ForegroundColor', p.MainTextColor, 'BackgroundColor', p.BackgroundColor);
-    set(p.InstructionHandle5, 'String', 'Extracting data... Please be patient', 'Visible', 'on');
-
-    pause(0.05)
-
-    if exist(fullfile('analysis mat files', sprintf('%s%03d.mat',ManVrouw, index)), 'file') ~= 0
-        load (fullfile('analysis mat files', sprintf('%s%03d.mat',ManVrouw, index)));
-    else
-        display('extracting f0')
-        [f0raw1,vuv]=MulticueF0v14(masker,fs);
-        ap=exstraightAPind(masker,fs,f0raw1);
-        n3sgram=exstraightspec(masker,f0raw1.*vuv,fs);
-        f0raw1(f0raw1<65)=0;
-        save(fullfile('analysis mat files', sprintf('%s%03d.mat',ManVrouw, index)), 'f0raw1', 'vuv', 'ap', 'n3sgram')
-    end
-
-    switch ManVrouw
-        case 'Man'
-            f0shift = f0raw1*2.^(conditions(2)/12);
-            p2.frequencyAxisMappingTable = 2.^(conditions(3)/12);
-        case 'Vrouw'
-            f0shift = f0raw1*2.^(-conditions(2)/12);
-            p2.frequencyAxisMappingTable = 2.^(-conditions(3)/12);
-    end
-
-    display('synthesizing')
-    masker = exstraightsynth(f0shift.*vuv,n3sgram,ap,fs, p2);
-
-    masker = 0.98*masker / abs(max(masker));
-    start = find(abs(masker)>.02, 1, 'first');
-    endx = find(abs(masker)>.02, 1, 'last');
-
-    masker_new = masker(start:endx);
-
-    wavwrite(masker_new, fs, fullfile('masker files', sprintf('%s%03d_f0%d_vtl%.2f.wav', ManVrouw, index, conditions(2), conditions(3))));
-    set(p.InstructionHandle5, 'Visible', 'off');
-    set(p.InstructionHandle4, 'Visible', 'off');
-end
-
-
-function additional_masker = get_additional_masker(p, conditions)
-
-    list = p.MaskerLists(1) + round(rand()*(p.MaskerLists(2) - p.MaskerLists(1)));
-    index3 = round((((list-1)*13)+round(rand()*13)));
-
-    if exist(fullfile('masker files', sprintf('%s%03d_f0%d_vtl%.2f.wav', p.ManVrouw, index3, conditions(2), conditions(3))), 'file') ~= 0
-        masker3 = wavread(fullfile('masker files', sprintf('%s%03d_f0%d_vtl%.2f.wav', p.ManVrouw, index3, conditions(2), conditions(3))));
-    else
-        masker3 = wavread(fullfile('sentences', sprintf('%s%03d.wav', p.ManVrouw, index3)));
-        [p, masker3] = modify_masker(p, masker3, conditions, p.fs, p.ManVrouw, index3);
-    end
-
-    start = round(rand()*(length(masker3)-p.fs));
-
-    additional_masker = masker3(start+1:end);
-    additional_masker = cosgate(additional_masker, p.fs, 2e-3);
-end
 
 %%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%%%%%  
 %%%%%%%%%%%%%%%%%%%%% %%%%%%%% GUI %%%%%%%% %%%%%%%%%%%%%%%%%%%%%
@@ -664,6 +526,7 @@ function p = set_GUI_case26(p)
 end
 
 function p = set_GUI_case27(p)
+
     set(p.ImageVoice, 'Visible','off') 
     set(p.ImageAnswer, 'Visible','off') 
     set(p.InstructionHandle1,'Visible','off') 
@@ -677,14 +540,18 @@ function p = set_GUI_case27(p)
 
     switch p.ManVrouw
         case 'Man'
-            sentence = p.VU_Zinnen{VU_index};
+            sentence = p.VU_zinnen{VU_index};
         case 'Vrouw'
-            sentence = p.VU_Zinnen{VU_index+507};
+            sentence = p.VU_zinnen{VU_index+507};
     end
 
-    line_cell_cell=textscan(sentence,'%s',10,'delimiter',' ');
-    p.Words=line_cell_cell{1};
-    p.Spacing = (p.widthSubScrn/(length(p.Words))) - p.widthSubScrn/25;
+%     line_cell_cell=textscan(sentence,'%s',10,'delimiter',' ');
+%     p.Words=line_cell_cell{1};
+    p.Words = regexp(sentence, ' ', 'split');
+    
+    screenSub = getScreens;
+    p.Spacing = (screenSub(3)/(length(p.Words))) - screenSub(3)/25;
+    
     p.SentenceScore = ones(length(p.Words), 1);
 
     p.LengthWords = length(p.Words);
@@ -765,8 +632,8 @@ end
 
 function p = set_progress_bar(p, handle, index, onoff, PosBar)
 
-    p.Waitbar1 = axes('Parent', handle, 'Units', 'pixel','Position', PosBar, 'XTick', [], 'YTick', []);
-    axes(p.Waitbar1)
+    p.delaybar1 = axes('Parent', handle, 'Units', 'pixel','Position', PosBar, 'XTick', [], 'YTick', []);
+    axes(p.delaybar1)
 
     switch p.Phase
         case {'Training1', 'Training2'}
@@ -781,11 +648,11 @@ function p = set_progress_bar(p, handle, index, onoff, PosBar)
             fill([0 1 1 0] * (index+p.TotalSampleLength*3)/(p.TotalSampleLength*4), [0 0 1 1], 'g', 'EdgeColor','g');
     end
 
-    set(p.Waitbar1, 'XColor', 'w', 'YColor', 'w', 'XTick', [], 'YTick', [], 'Xlim', [0 1], 'YLim', [0 1]);
-    p.WaitbarLegend1 = uicontrol('Parent', handle, 'Style', 'text', 'Units', 'pixel', 'Position', [PosBar(1) PosBar(2)-PosBar(4) PosBar(3) PosBar(4)], ...
+    set(p.delaybar1, 'XColor', 'w', 'YColor', 'w', 'XTick', [], 'YTick', [], 'Xlim', [0 1], 'YLim', [0 1]);
+    p.delaybarLegend1 = uicontrol('Parent', handle, 'Style', 'text', 'Units', 'pixel', 'Position', [PosBar(1) PosBar(2)-PosBar(4) PosBar(3) PosBar(4)], ...
         'FontSize', 20, 'ForegroundColor', p.MainTextColor, 'BackgroundColor', p.BackgroundColor);
-    set(p.WaitbarLegend1, 'String', p.Phase(1:end-1), 'Visible', onoff)
-    set(p.Waitbar1, 'Visible', onoff)
+    set(p.delaybarLegend1, 'String', p.Phase(1:end-1), 'Visible', onoff)
+    set(p.delaybar1, 'Visible', onoff)
 end
 
 
@@ -793,71 +660,7 @@ end
 %%%%%%%%%%%%%%%%%%%%% %%% Preprocessing %%% %%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%%%%% %%%%%%%%%%%%%%%%%%%%% 
 
-function [p] = initialize_parameters(Options, Phase_Index)
 
-%% function [p] = initialize_parameters(Options, Phase_Index)
-%
-%  function that creates the parameter struct p based on the Options
-%  and phase of the experiment (training vs test).
-%  The 'p' struct contains even the info on screen sizes and so on!
-
-
-    p = load('VU_zinnen.mat');
-    p.PhaseIndex = Phase_Index;
-
-    assignin('caller', 'User2_Sitch', [1 0]) %instead of creating a var and passing it to the caller environment
-    assignin('caller', 'User_Sitch', 1)     %create these vars (User(2)_Sitch) in the caller environment/workspace, and assign these values to them.
-
-    p.Init = 1;
-    p.Continu = 1;
-
-    p.Player.Running = 'off';
-    p.i = 1;
-    p.i2 = 1;
-    p.AnnotationsAvailable = p.i;
-
-
-    %EXPE_GUI:
-    p.BackgroundColor = [.4 .4 .4];
-    p.MainTextColor = [1 1 1]*.9;
-    p.ProgressbarColor = [.5 .8 .5];
-
-    [p.screenSub, p.screenExp] = getScreens;
-    
-    p.widthSubScrn = p.screenSub(3);
-    p.WidthBig = p.screenExp(3);
-    p.heightSubScrn =  p.screenSub(4);
-    p.HeightBig = p.screenExp(4);
-
-
-    p.SamplesPerCondition = Options.SamplesPerCondition(Phase_Index);
-    p.ManVrouw = Options.ManVrouw{Phase_Index};
-    p.Subject = Options.Subject;
-    p.Phase = Options.Phase{Phase_Index};
-
-    for f0 = 1:length(Options.f0)
-        for vtl = 1:length(Options.vtl)
-            for snr = 1:length(Options.snr)
-                p.ConditionsNames{f0, vtl, snr} = sprintf('f0%d_vtl%.2f_snr%d', Options.f0(f0), Options.vtl(vtl), Options.snr(snr));
-                p.ConditionsCounts(f0, vtl, snr) = 0;
-                p.ConditionsCorrect(f0, vtl, snr) = 0;
-            end
-        end
-    end
-
-    p.Conditions.f0 = Options.f0;
-    p.Conditions.vtl = Options.vtl;
-    p.Conditions.snr = Options.snr;
-    p.MaskerLists = Options.MaskerLists;
-    p.IndexStartingPoint = Options.IndexStartingPoint(Phase_Index);
-    p.fs = Options.fs;
-    p.Target_rms = Options.Target_rms;
-
-    if ~exist(sprintf('subject%s', p.Subject), 'dir')
-        mkdir(sprintf('subject%s', p.Subject));
-    end
-    
-end
 
 
 function p = make_file_names(p)
@@ -904,141 +707,7 @@ function p = make_file_names(p)
 end
 
 
-function p = initialize_figures_and_get_handles(p, options)
 
-    p.f1=figure('Position', p.screenSub, 'Menubar', 'none', 'Resize', 'off', 'Color', p.BackgroundColor);
-    p.f2=figure('Position', p.screenExp, 'Menubar', 'none', 'Resize', 'off', 'Color', p.BackgroundColor);
-
-    p.PosCenter = [p.widthSubScrn/2.25, p.heightSubScrn/2, p.widthSubScrn/12, p.heightSubScrn/10];
-    p.PosBottom = [p.widthSubScrn/2.2, p.heightSubScrn/6, p.widthSubScrn/16, p.heightSubScrn/16];
-
-
-    p.PosRight = [p.widthSubScrn/4+p.widthSubScrn/2.5+p.widthSubScrn/10, p.heightSubScrn/2.5, p.widthSubScrn/16, p.heightSubScrn/16];
-    p.PosJohn = [p.widthSubScrn/4-p.widthSubScrn/10 p.heightSubScrn/6, p.widthSubScrn/10, p.heightSubScrn/2];
-    p.PosText = [p.widthSubScrn/4, p.heightSubScrn/6, p.widthSubScrn/2.5 p.heightSubScrn/2];
-    p.PosInstruction1 = [p.widthSubScrn/2.5, p.heightSubScrn/15+p.heightSubScrn/8+p.heightSubScrn/2, p.widthSubScrn/12+p.widthSubScrn/10, p.heightSubScrn/15];
-    p.PosBar1 = [p.widthSubScrn/2 - (p.widthSubScrn/3)/2,  p.heightSubScrn-p.heightSubScrn/16, p.widthSubScrn/3, p.heightSubScrn/16];
-    p.PosInstruction5 = [p.widthSubScrn/16, p.heightSubScrn/1.5+p.heightSubScrn/16, p.widthSubScrn/8, p.heightSubScrn/4];
-
-
-    p.PosBar2 = [p.WidthBig/2-(p.WidthBig/3)/2,  p.HeightBig-p.HeightBig/16, p.WidthBig/3, p.HeightBig/16];
-    p.PosButtons = [p.WidthBig/16 p.HeightBig/2.5 p.WidthBig/25 p.WidthBig/25];
-    p.PosButtons_Small = [p.widthSubScrn/16 p.heightSubScrn/2.5 p.widthSubScrn/25 p.widthSubScrn/25];
-    p.PosBottom2 = [p.WidthBig/2-(p.WidthBig/16)/2, p.HeightBig/7.5, p.WidthBig/16, p.HeightBig/16];
-    p.PosInstruction2 = [p.WidthBig/4+p.WidthBig/2.5+p.WidthBig/10, p.HeightBig/1.5, p.WidthBig/16, p.HeightBig/16];
-    p.PosInstruction3 = [p.WidthBig/4+p.WidthBig/2.5+p.WidthBig/10, p.HeightBig/1.5+p.HeightBig/16, p.WidthBig/16, p.HeightBig/16];
-    p.PosInstruction4 = [p.WidthBig/16, p.HeightBig/1.5+p.HeightBig/16, p.WidthBig/12, p.HeightBig/8];
-
-    p.PosPause1 = [p.widthSubScrn/2-p.widthSubScrn/12, p.heightSubScrn/1.5+p.heightSubScrn/16, p.widthSubScrn/8, p.heightSubScrn/16];
-    p.PosPause2 = [p.WidthBig/2-p.WidthBig/12, p.HeightBig/1.5+p.HeightBig/16, p.WidthBig/12, p.HeightBig/16];
-
-
-    % user figures
-    im_play=imread([options.imagesDir 'play.jpg']);
-    play_axes_handel = axes('Visible', 'off', 'Parent', p.f1, 'Units', 'pixel','Position', p.PosCenter, 'XTick', [], 'YTick', []);
-    axes(play_axes_handel)
-    p.ImagePlay=image(im_play);
-    set(p.ImagePlay, 'Visible','off')
-    set(play_axes_handel, 'Visible','off')
-
-    im_speaker=imread([options.imagesDir 'speaker.jpg']);
-    speaker_image_axes_handle = axes('Visible', 'off', 'Parent', p.f1, 'Units', 'pixel','Position', p.PosCenter, 'XTick', [], 'YTick', []);
-    axes(speaker_image_axes_handle)
-    p.ImageSpeaker=image(im_speaker);
-    set(p.ImageSpeaker, 'Visible','off')
-    set(speaker_image_axes_handle, 'Visible','off')
-
-    im_voice=imread([options.imagesDir 'voice.jpg']);
-    voice_image_axes_handle = axes('Visible', 'off', 'Parent', p.f1, 'Units', 'pixel','Position', p.PosCenter, 'XTick', [], 'YTick', []);
-    axes(voice_image_axes_handle)
-    p.ImageVoice=image(im_voice);
-    set(p.ImageVoice, 'Visible','off')
-    set(voice_image_axes_handle, 'Visible','off')
-
-    im_arrow=imread([options.imagesDir 'continue_arrow.jpg']);
-    arrow_image_axes_handle = axes('Visible', 'off', 'Parent', p.f1, 'Units', 'pixel','Position', p.PosBottom, 'XTick', [], 'YTick', []);
-    axes(arrow_image_axes_handle)
-    p.ImageArrow=image(im_arrow);
-    set(p.ImageArrow, 'Visible','off')
-    set(arrow_image_axes_handle, 'Visible','off')
-
-    p.Text = uicontrol('Parent', p.f1, 'Style', 'text', 'Position', p.PosText, 'Fontsize', 16, 'HorizontalAlignment', 'left', 'BackgroundColor', [1 1 1], 'Visible', 'off');
-
-    im_arrow2=imread([options.imagesDir 'continue_arrow.jpg']);
-    arrow_image_axes_handle2 = axes('Visible', 'off', 'Parent', p.f1, 'Units', 'pixel','Position', p.PosRight, 'XTick', [], 'YTick', []);
-    axes(arrow_image_axes_handle2)
-    p.ImageArrow2=image(im_arrow2);
-    set(p.ImageArrow2, 'Visible','off')
-    set(arrow_image_axes_handle2, 'Visible','off')
-
-    john_intro=imread([options.imagesDir 'john_intro.jpg']);
-    john_intro_image_axes_handle = axes('Visible', 'off', 'Parent', p.f1, 'Units', 'pixel','Position', p.PosJohn, 'XTick', [], 'YTick', []);
-    axes(john_intro_image_axes_handle)
-    p.ImageJohnIntro=image(john_intro);
-    set(p.ImageJohnIntro, 'Visible','off')
-    set(john_intro_image_axes_handle, 'Visible','off')
-
-    john_sleeping=imread([options.imagesDir 'john_sleeping.jpg']);
-    john_sleeping_image_axes_handle = axes('Visible', 'off', 'Parent', p.f1, 'Units', 'pixel','Position', p.PosJohn, 'XTick', [], 'YTick', []);
-    axes(john_sleeping_image_axes_handle)
-    p.ImageJohnSleeping=image(john_sleeping);
-    set(p.ImageJohnSleeping, 'Visible','off')
-    set(john_sleeping_image_axes_handle, 'Visible','off')
-
-    john_happy=imread([options.imagesDir 'john_happy.jpg']);
-    john_happy_image_axes_handle = axes('Visible', 'off', 'Parent', p.f1, 'Units', 'pixel','Position', p.PosJohn, 'XTick', [], 'YTick', []);
-    axes(john_happy_image_axes_handle)
-    p.ImageJohnHappy=image(john_happy);
-    set(p.ImageJohnHappy, 'Visible','off')
-    set(john_happy_image_axes_handle, 'Visible','off')
-
-    john_neutral=imread([options.imagesDir 'john_neutral.jpg']);
-    john_neutral_image_axes_handle = axes('Visible', 'off', 'Parent', p.f1, 'Units', 'pixel','Position', p.PosJohn, 'XTick', [], 'YTick', []);
-    axes(john_neutral_image_axes_handle)
-    p.ImageJohnNeutral=image(john_neutral);
-    set(p.ImageJohnNeutral, 'Visible','off')
-    set(john_neutral_image_axes_handle, 'Visible','off')
-
-    john_yawning=imread([options.imagesDir 'john_yawning.jpg']);
-    john_yawning_image_axes_handle = axes('Visible', 'off', 'Parent', p.f1, 'Units', 'pixel','Position', p.PosJohn, 'XTick', [], 'YTick', []);
-    axes(john_yawning_image_axes_handle)
-    p.ImageJohnYawning=image(john_yawning);
-    set(p.ImageJohnYawning, 'Visible','off')
-    set(john_yawning_image_axes_handle, 'Visible','off')
-
-    answer=imread([options.imagesDir 'answer.jpg']);
-    answer_axes_handle = axes('Visible', 'off', 'Parent', p.f1, 'Units', 'pixel','Position', p.PosBottom, 'XTick', [], 'YTick', []);
-    axes(answer_axes_handle)
-    p.ImageAnswer=image(answer);
-    set(p.ImageAnswer, 'Visible','off')
-    set(answer_axes_handle, 'Visible','off')
-
-    replay=imread([options.imagesDir 'replay.jpg']);
-    replay_aces_handle = axes('Visible', 'off', 'Parent', p.f1, 'Units', 'pixel','Position', p.PosBottom, 'XTick', [], 'YTick', []);
-    axes(replay_aces_handle)
-    p.ImageReplay=image(replay);
-    set(p.ImageReplay, 'Visible','off')
-    set(replay_aces_handle, 'Visible','off')
-
-    p.InstructionHandle1= uicontrol('Parent', p.f1, 'Style', 'text', 'Units', 'pixel', 'Position', p.PosInstruction1, ...
-        'FontSize', 20, 'ForegroundColor', p.MainTextColor, 'BackgroundColor', p.BackgroundColor);
-
-    % user 2 figure preperation
-    p.ImreadConfirm = imread([options.imagesDir 'confirm.jpg']);
-    p.ImreadWrong = imread([options.imagesDir 'wrong.jpg']);
-    p.ImreadRight = imread([options.imagesDir 'right.jpg']);
-
-    % pause instruction
-    p.InstructionHandle6 = uicontrol('Parent', p.f2, 'Style', 'text', 'Units', 'pixel', 'Position', p.PosPause2, ...
-        'FontSize', 20, 'ForegroundColor', p.MainTextColor, 'BackgroundColor', p.BackgroundColor);
-    p.InstructionHandle7= uicontrol('Parent', p.f1, 'Style', 'text', 'Units', 'pixel', 'Position', p.PosPause1, ...
-        'FontSize', 20, 'ForegroundColor', p.MainTextColor, 'BackgroundColor', p.BackgroundColor);
-
-    % initialize spacebar callback
-    set(p.f2, 'KeyPressFcn', {@spacebar_callback});
-    set(p.f1, 'KeyPressFcn', {@spacebar_callback});
-    
-end
 
 function p = initialize_saved(p)
     

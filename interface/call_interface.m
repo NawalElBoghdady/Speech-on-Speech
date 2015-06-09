@@ -27,7 +27,7 @@ for phaseIndex = 1:length(phases);
 
 end
   
-rmpath(options.PathToStraight);
+rmpath(options.PathToStraight);close
 
 
 

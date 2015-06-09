@@ -25,6 +25,12 @@ function options = setDirectories(options)
             error('Wrong path for sentences')
         end
     end
+    
+    if ~exist(sprintf('%ssubject%s', options.matFilesDir, options.sNum), 'dir')
+        mkdir(sprintf('%ssubject%s', options.matFilesDir, options.sNum));
+    end
+
+    
 
     if ~exist(options.PathToStraight, 'dir')
         answer=inputdlg('Where is straight?', 'Straight directory', ...

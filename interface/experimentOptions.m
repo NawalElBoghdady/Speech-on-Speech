@@ -1,19 +1,20 @@
 function options = experimentOptions
 
     % EXPERIMENT OPTIONS
-    options.resultsDir = '~/speechOnSpeech/analysisMatFiles/';
+    options.matFilesDir = '~/speechOnSpeech/analysisMatFiles/';
     options.imagesDir = '~/speechOnSpeech/images/';
-    options.maskerDir = '~/speechOnSpeech/maskerFiles';
-    options.sentencesDir = '~/speechOnSpeech/sentences';
+    options.imagesDir = '~/speechOnSpeech/images/';
+    options.maskerDir = '~/speechOnSpeech/maskerFiles/';
+    options.sentencesDir = '~/speechOnSpeech/sentences/';
+    options.resultsDir = '~/speechOnSpeech/results/';
+    
     options.PathToStraight = '/home/paolot/gitStuff/Beautiful/lib/STRAIGHTV40_006b/';
-
-    [b, s] = is_test_machine;
+    [~, s] = is_test_machine;
     if ~strcmp(s, '12-000-4372')
         options.PathToStraight = genpath(fullfile('..', 'straight', 'STRAIGHT'));
     end
-
-    options = setDirectories(options);
-
+    
+    
     def = 'sub001.mat';
     resFiles = dir([options.resultsDir '/*.mat']);
     if ~isempty(resFiles)
@@ -24,6 +25,10 @@ function options = experimentOptions
     % PARTICIPANTS OPTIONS
     
     options.Subject = sub{:};
+    options.sNum = str2double(options.Subject(regexp(options.Subject, 'sub', 'end') + 1 : ...
+        strfind(options.Subject, '.mat')-1));
+    
+    options = setDirectories(options);
 
     options.f0 = [0, 4, 8];
     options.vtl = [0, 0.75, 1.5];
